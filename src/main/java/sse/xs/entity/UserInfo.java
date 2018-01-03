@@ -6,6 +6,6 @@ package sse.xs.entity;
  * Email:xusongnice@gmail.com
  */
 public class UserInfo {
-    String name;
-    String pwd;
+    public String name;
+    public String pwd;
 }

@@ -2,12 +2,13 @@ package sse.xs.msg;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
-import org.omg.CORBA.PUBLIC_MEMBER;
 import sse.xs.msg.data.CloseMsg;
 import sse.xs.msg.data.ConnMsg;
+import sse.xs.msg.data.Response;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.HashMap;
 import java.util.Optional;
 
 /**
@@ -16,11 +17,11 @@ import java.util.Optional;
  * Email:xusongnice@gmail.com
  */
 public class Message<T> {
-    public static final int TYPE_CLOSE = 1;
+    public static final int TYPE_DISCONN = 1;
     public static final int TYPE_CONN = -1;
 
     public static final int TYPE_REGISTER =-2;
-    public static final int TYPE_LON_IN = 2;
+    public static final int TYPE_LOG_IN = 2;
     public static final int TYPE_LOG_OUT = 3;
 
     public static final int TYPE_TALK = 4;
@@ -33,16 +34,23 @@ public class Message<T> {
     public static final int TYPE_STATICS = 9;
 
 
+    public static final int TYPE_LOGIN_RESPONSE = 100;
+    public static final int TYPE_LOGOUT_RESPONSE = 101;
+    public static final int TYPE_REGISTER_RESPONSE = 102;
+
+    private static HashMap<Integer,Class> classMaps = new HashMap<>();
+    static {
+        classMaps.put(100, Response.class);
+        classMaps.put(101,Response.class);
+        classMaps.put(102,Response.class);
+    }
+
     public int type;
+    public String key;//每次操作的标识码,同一个标识码标志一个终端
     public T data;
 
 
     public static Gson gson = new Gson();
-
-    @Override
-    public String toString() {
-        return "type: " + type + " data: " + data;
-    }
 
     public static Message createCloseConnMsg(String reason) {
         Message message = new Message<CloseMsg>();
@@ -77,7 +85,7 @@ public class Message<T> {
     public static Optional<Message> getActualMessage(JsonElement element) {
         Message received = gson.fromJson(element, Message.class);
         switch (received.type) {
-            case TYPE_CLOSE:
+            case TYPE_DISCONN:
                 return Optional.of(gson.fromJson(element, generateType(CloseMsg.class)));
             case TYPE_CONN:
                 return Optional.of(gson.fromJson(element, generateType(ConnMsg.class)));
@@ -85,5 +93,8 @@ public class Message<T> {
         return Optional.empty();
     }
 
-
+    @Override
+    public String toString() {
+        return gson.toJson(this,generateType(classMaps.get(type)));
+    }
 }

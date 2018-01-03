@@ -51,8 +51,8 @@ public class JsonConnection {
     }
 
     // TODO: 2018/1/2 写入正确的数据
-    public void writeJson(Message msg) throws IOException {
-        writer.write(msg.toString());
+    public void writeJson(String msg) throws IOException {
+        writer.write(msg);
     }
 
     public void close()  {

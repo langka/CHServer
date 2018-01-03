@@ -3,6 +3,7 @@ package sse.xs.server;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import sse.xs.conn.JsonConnection;
+import sse.xs.entity.OnlineUser;
 import sse.xs.msg.Message;
 import sse.xs.msg.data.ConnMsg;
 
@@ -23,7 +24,7 @@ import static sse.xs.msg.data.ConnMsg.STATE_RETRY;
  */
 public class Server {
     public static void main(String[] args) {
-        Server server = Server.create();
+        Server server = Server.GET();
         try {
             server.start();
         } catch (IOException e) {
@@ -41,20 +42,31 @@ public class Server {
     private ConnHandler connHandler = new ConnHandlerImpl();
 
 
+    private final Sender sender = new Sender();
+
+    public Sender getSender(){
+        return sender;
+    }
 
     /*
       static methods
      */
 
-    public static Server create() {
-        return new Server();
+    private static Server instance = new Server();
+
+    public static Server GET() {
+        return instance;
     }
 
     /*
 
      */
 
-    public Server() {
+    public OnlineUser getOnlineUser(String key){
+        return connHandler.getByKey(key);
+    }
+
+    private Server() {
 
     }
 
@@ -66,6 +78,8 @@ public class Server {
             connExec.submit(new AcceptTask(connHandler,socket, bound));
         }
     }
+
+
 
 }
 
@@ -86,7 +100,7 @@ class AcceptTask implements Runnable {
         if (i > Server.CONNCOUNT) {//超限
             Message message = Message.createCloseConnMsg("服务器连接超过上限");
             try {
-                jsonConnection.writeJson(message);
+                jsonConnection.writeJson(message.toString());
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
@@ -98,7 +112,7 @@ class AcceptTask implements Runnable {
                 Message received=gson.fromJson(element,Message.class);
                 if(received.type!=Message.TYPE_CONN){
                     Message reason = Message.createCloseConnMsg("非法的连接请求，请重试");
-                    jsonConnection.writeJson(reason);
+                    jsonConnection.writeJson(reason.toString());
                     jsonConnection.close();
                 }
                 else{//连接建立，转化为正确的泛型

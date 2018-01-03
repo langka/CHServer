@@ -38,4 +38,9 @@ public class ConnHandlerImpl implements ConnHandler {
     public void applyRetry(JsonConnection connection, String key) {
 
     }
+
+    @Override
+    public OnlineUser getByKey(String key) {
+        return players.get(key);
+    }
 }
