@@ -5,7 +5,7 @@ package sse.xs.msg.data;
  * Email:xusong@bupt.edu.cn
  * Email:xusongnice@gmail.com
  */
-public class ConnMessage {
+public class ConnMsg {
     public static int STATE_FIRST = 1;
     public static int STATE_RETRY = 2;
 

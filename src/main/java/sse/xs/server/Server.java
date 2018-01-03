@@ -4,7 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import sse.xs.conn.JsonConnection;
 import sse.xs.msg.Message;
-import sse.xs.msg.data.ConnMessage;
+import sse.xs.msg.data.ConnMsg;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -13,8 +13,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static sse.xs.msg.data.ConnMessage.STATE_FIRST;
-import static sse.xs.msg.data.ConnMessage.STATE_RETRY;
+import static sse.xs.msg.data.ConnMsg.STATE_FIRST;
+import static sse.xs.msg.data.ConnMsg.STATE_RETRY;
 
 /**
  * Created by xusong on 2017/11/25.
@@ -38,17 +38,8 @@ public class Server {
     //这个线程池负责接受连接请求
     private ExecutorService connExec = Executors.newCachedThreadPool();
 
-    private ConnHandler connHandler = new ConnHandler() {
-        @Override
-        public void applyFirst(JsonConnection connection) {
+    private ConnHandler connHandler = new ConnHandlerImpl();
 
-        }
-
-        @Override
-        public void applyRetry(JsonConnection connection, String key) {
-
-        }
-    };
 
 
     /*
@@ -111,7 +102,7 @@ class AcceptTask implements Runnable {
                     jsonConnection.close();
                 }
                 else{//连接建立，转化为正确的泛型
-                    Message<ConnMessage> connMessage = gson.fromJson(element,Message.generateType(ConnMessage.class));
+                    Message<ConnMsg> connMessage = gson.fromJson(element,Message.generateType(ConnMsg.class));
                     if(connMessage.data.state==STATE_RETRY){
                         handler.applyRetry(jsonConnection,connMessage.data.key);
                     }else if(connMessage.data.state==STATE_FIRST){//

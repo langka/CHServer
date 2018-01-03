@@ -1,13 +1,12 @@
 package sse.xs.conn;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
 import sse.xs.msg.Message;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.Optional;
 
 /**
  * Created by xusong on 2017/11/26.
@@ -38,8 +37,17 @@ public class JsonConnection {
         reader = new InputStreamReader(socket.getInputStream());
     }
 
-    public JsonElement readJson() throws IOException {
+    public JsonElement readJson() throws IOException{
         return parser.parse(reader);
+    }
+
+    public Optional<JsonElement> readJsonNoException(){
+        try {
+            JsonElement element = parser.parse(reader);
+            return Optional.of(element);
+        } catch (JsonIOException | JsonSyntaxException e) {
+            return Optional.empty();
+        }
     }
 
     // TODO: 2018/1/2 写入正确的数据
