@@ -4,6 +4,7 @@ import sse.xs.conn.JsonConnection;
 import sse.xs.entity.OnlineUser;
 import sse.xs.msg.Message;
 
+import java.io.IOException;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,7 +29,13 @@ public class ConnHandlerImpl implements ConnHandler {
             key= UUID.randomUUID().toString();
             OnlineUser previous = players.putIfAbsent(key, onlineUser);
             if (previous == null) {//put成功
-                onlineUser.prepare();
+                try {
+                    Message message = Message.createConnResp(key);
+                    connection.writeJson(message.toString());
+                    onlineUser.prepare();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
                 break;
             }
         }

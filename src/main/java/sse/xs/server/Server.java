@@ -42,7 +42,7 @@ public class Server {
     private ConnHandler connHandler = new ConnHandlerImpl();
 
 
-    private final Sender sender = new Sender();
+    private final Sender sender = new Sender(this);
 
     public Sender getSender(){
         return sender;
@@ -72,7 +72,6 @@ public class Server {
 
     public void start() throws IOException {
         ServerSocket serverSocket = new ServerSocket(9876);
-        int threads = 0;
         while (true) {
             Socket socket = serverSocket.accept();
             connExec.submit(new AcceptTask(connHandler,socket, bound));
@@ -89,6 +88,7 @@ class AcceptTask implements Runnable {
     ConnHandler handler;
     AtomicInteger bound;
     public AcceptTask(ConnHandler handler,Socket socket, AtomicInteger bound) {
+        this.handler = handler;
         jsonConnection = JsonConnection.createConnection(socket);
         this.bound = bound;
     }

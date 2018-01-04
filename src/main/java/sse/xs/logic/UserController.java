@@ -24,12 +24,11 @@ public class UserController {
     }
 
     public void handleLogIn(Message message) {
-        Message<LogInMsg> logInMsgMessage = message;
         Message<Response> responseMessage = new Message<>();
         responseMessage.type = Message.TYPE_LOGIN_RESPONSE;
-        if (logInMsgMessage.data.info.name.equals("xusong") && logInMsgMessage.data.info.pwd.equals("xusong")) {//能够成功登陆
+        if (((Message<LogInMsg>) message).data.info.name.equals("xusong") && ((Message<LogInMsg>) message).data.info.pwd.equals("xusong")) {//能够成功登陆
             OnlineUser user = server.getOnlineUser(message.key);
-            user.setUserInfo(logInMsgMessage.data.info);
+            user.setUserInfo(((Message<LogInMsg>) message).data.info);
             //发送登陆成功的消息
             Response response = new Response();
             response.success = true;

@@ -15,12 +15,12 @@ import java.util.Optional;
  */
 public class JsonConnection {
     private Socket socket;
-    private Gson gson = new Gson();
 
-    private Writer writer;
+    private OutputStreamWriter writer;
     private InputStreamReader reader;
+    JsonReader jsonReader;
 
-    private JsonParser parser;
+    private JsonParser parser = new JsonParser();
 
     public static JsonConnection createConnection(Socket socket){
         try {
@@ -33,17 +33,23 @@ public class JsonConnection {
 
     private JsonConnection(Socket socket) throws IOException {
         this.socket = socket;
-        writer = new OutputStreamWriter(socket.getOutputStream());
-        reader = new InputStreamReader(socket.getInputStream());
+        writer = new OutputStreamWriter(socket.getOutputStream(),"UTF-8");
+        reader = new InputStreamReader(socket.getInputStream(),"UTF-8");
+        jsonReader = new JsonReader(reader);
+        jsonReader.setLenient(true);
     }
 
-    public JsonElement readJson() throws IOException{
-        return parser.parse(reader);
+    public JsonElement readJson() throws JsonIOException{
+        for(;;){
+            JsonElement element=parser.parse(jsonReader);
+            if(element!=null)
+            return element;
+        }
     }
 
     public Optional<JsonElement> readJsonNoException(){
         try {
-            JsonElement element = parser.parse(reader);
+            JsonElement element = parser.parse(jsonReader);
             return Optional.of(element);
         } catch (JsonIOException | JsonSyntaxException e) {
             return Optional.empty();
@@ -53,6 +59,7 @@ public class JsonConnection {
     // TODO: 2018/1/2 写入正确的数据
     public void writeJson(String msg) throws IOException {
         writer.write(msg);
+        writer.flush();
     }
 
     public void close()  {

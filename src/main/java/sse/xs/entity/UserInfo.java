@@ -8,4 +8,12 @@ package sse.xs.entity;
 public class UserInfo {
     public String name;
     public String pwd;
+
+    public UserInfo(String name, String pwd) {
+        this.name = name;
+        this.pwd = pwd;
+    }
+    public UserInfo(){
+
+    }
 }
