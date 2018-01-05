@@ -4,8 +4,10 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import sse.xs.conn.JsonConnection;
 import sse.xs.entity.OnlineUser;
+import sse.xs.logic.RoomManager;
 import sse.xs.msg.Message;
-import sse.xs.msg.data.ConnMsg;
+import sse.xs.msg.data.ConnRequest;
+import sse.xs.msg.data.RoomRequest;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -14,8 +16,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static sse.xs.msg.data.ConnMsg.STATE_FIRST;
-import static sse.xs.msg.data.ConnMsg.STATE_RETRY;
+import static sse.xs.msg.data.ConnRequest.STATE_FIRST;
+import static sse.xs.msg.data.ConnRequest.STATE_RETRY;
 
 /**
  * Created by xusong on 2017/11/25.
@@ -41,6 +43,7 @@ public class Server {
 
     private ConnHandler connHandler = new ConnHandlerImpl();
 
+    private RoomManager roomManager = new RoomManager(this);
 
     private final Sender sender = new Sender(this);
 
@@ -65,6 +68,11 @@ public class Server {
     public OnlineUser getOnlineUser(String key){
         return connHandler.getByKey(key);
     }
+
+    public void dispatchRoomMessage(Message<RoomRequest> message){
+        roomManager.handleRoomMessage(message);
+    }
+
 
     private Server() {
 
@@ -116,7 +124,7 @@ class AcceptTask implements Runnable {
                     jsonConnection.close();
                 }
                 else{//连接建立，转化为正确的泛型
-                    Message<ConnMsg> connMessage = gson.fromJson(element,Message.generateType(ConnMsg.class));
+                    Message<ConnRequest> connMessage = gson.fromJson(element,Message.generateType(ConnRequest.class));
                     if(connMessage.data.state==STATE_RETRY){
                         handler.applyRetry(jsonConnection,connMessage.data.key);
                     }else if(connMessage.data.state==STATE_FIRST){//

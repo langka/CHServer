@@ -7,8 +7,6 @@ import sse.xs.entity.UserInfo;
  * Email:xusong@bupt.edu.cn
  * Email:xusongnice@gmail.com
  */
-public class RegisterMsg {
+public class LogInRequest {
     public UserInfo info;
-
-
 }

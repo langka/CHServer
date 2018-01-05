@@ -5,6 +5,7 @@ import sse.xs.conn.JsonConnection;
 import sse.xs.logic.UserController;
 import sse.xs.msg.Message;
 import sse.xs.server.MessageListener;
+import sse.xs.server.Server;
 
 import java.io.IOException;
 import java.util.Optional;
@@ -26,7 +27,6 @@ public class OnlineUser {
     private final UserInfo userInfo;
     private JsonConnection connection;
 
-
     //消息监听器
     private final MessageListener listener = (message) -> dispatchThreads.submit(getTask(message));
 
@@ -38,6 +38,11 @@ public class OnlineUser {
                 return () -> UserController.getInstance().handleLogOut(m);
             case Message.TYPE_REGISTER:
                 return () -> UserController.getInstance().handleRegister(m);
+            case Message.TYPE_JOIN_ROOM:
+            case Message.TYPE_LEAVE_ROOM:
+            case Message.TYPE_SWAP_ROOM:
+            case Message.TYPE_CREATE_ROOM:
+                return () -> Server.GET().dispatchRoomMessage(m);
         }
         return () -> {
         };
@@ -66,16 +71,6 @@ public class OnlineUser {
         connection.writeJson(message);
     }
 
-    /**
-     * message dispatch
-     */
-    private void handleLogIn(Message message) {
-
-    }
-
-    private void handleLogOut(Message message) {
-
-    }
 
     //连接建立好后准备阶段,此时已经没有connmsg
     public void prepare() {

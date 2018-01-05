@@ -1,5 +1,7 @@
 package sse.xs.server
 
+import sse.xs.entity.OnlineUser
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.language.implicitConversions
@@ -9,7 +11,7 @@ import scala.language.implicitConversions
   * Email:xusong@bupt.edu.cn
   * Email:xusongnice@gmail.com
   */
-class Sender(server:Server) {
+class Sender(server: Server) {
 
   implicit def convertFunction(f: () => Unit): Runnable = {
     new Runnable {
@@ -18,7 +20,9 @@ class Sender(server:Server) {
   }
 
   def sendMessage(msg: String, targetKey: String): Unit = {
-    Future(server.getOnlineUser(targetKey)).foreach(a =>if(a!=null) a.sendMessage(msg))
+    val f: OnlineUser => Unit = a => if (a != null) a.sendMessage(msg)
+    if (targetKey != null)
+      Future(server.getOnlineUser(targetKey)).foreach(f)
   }
 
 }

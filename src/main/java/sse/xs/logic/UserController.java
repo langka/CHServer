@@ -2,8 +2,8 @@ package sse.xs.logic;
 
 import sse.xs.entity.OnlineUser;
 import sse.xs.msg.Message;
-import sse.xs.msg.data.LogInMsg;
-import sse.xs.msg.data.Response;
+import sse.xs.msg.data.LogInRequest;
+import sse.xs.msg.data.response.AccountResponse;
 import sse.xs.server.Server;
 
 /**
@@ -24,18 +24,18 @@ public class UserController {
     }
 
     public void handleLogIn(Message message) {
-        Message<Response> responseMessage = new Message<>();
+        Message<AccountResponse> responseMessage = new Message<>();
         responseMessage.type = Message.TYPE_LOGIN_RESPONSE;
-        if (((Message<LogInMsg>) message).data.info.name.equals("xusong") && ((Message<LogInMsg>) message).data.info.pwd.equals("xusong")) {//能够成功登陆
+        if (((Message<LogInRequest>) message).data.info.name.equals("xusong") && ((Message<LogInRequest>) message).data.info.pwd.equals("xusong")) {//能够成功登陆
             OnlineUser user = server.getOnlineUser(message.key);
-            user.setUserInfo(((Message<LogInMsg>) message).data.info);
+            user.setUserInfo(((Message<LogInRequest>) message).data.info);
             //发送登陆成功的消息
-            Response response = new Response();
+            AccountResponse response = new AccountResponse();
             response.success = true;
             response.info = "登陆成功！";
             responseMessage.data = response;
         } else {//发送登陆失败的消息
-            Response response = new Response();
+            AccountResponse response = new AccountResponse();
             response.success = false;
             response.info = "账号或密码错误";
             responseMessage.data = response;
@@ -50,5 +50,7 @@ public class UserController {
     public void handleRegister(Message message) {
 
     }
+
+
 
 }

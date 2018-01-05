@@ -3,7 +3,7 @@ import org.junit.Test;
 import sse.xs.conn.JsonConnection;
 import sse.xs.entity.UserInfo;
 import sse.xs.msg.Message;
-import sse.xs.msg.data.Response;
+import sse.xs.msg.data.response.AccountResponse;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -27,7 +27,7 @@ public class ConnTest {
             Message login = Message.createLoginMessage(new UserInfo("xusong","xusong"));
             Message log2 = Message.createLoginMessage(new UserInfo("gaoyuan","gaoyuan"));
             connection.writeJson(m.toString());
-            Message<Response> coResp=Message.getActualMessage(connection.readJson()).get();
+            Message<AccountResponse> coResp=Message.getActualMessage(connection.readJson()).get();
             String key = coResp.key;
             login.key = key;
             log2.key = key;

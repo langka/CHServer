@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class ConnHandlerImpl implements ConnHandler {
 
-    ConcurrentHashMap<String, OnlineUser> players = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<String, OnlineUser> players = new ConcurrentHashMap<>();
     //用于生成随机数字作为签名
     Random random = new Random();
 
@@ -25,8 +25,8 @@ public class ConnHandlerImpl implements ConnHandler {
     public void applyFirst(JsonConnection connection) {
         OnlineUser onlineUser = new OnlineUser();
         onlineUser.setConnection(connection);
-        for (String key; ;) {//循环直至放置成功
-            key= UUID.randomUUID().toString();
+        for (String key; ; ) {//循环直至放置成功
+            key = UUID.randomUUID().toString();
             OnlineUser previous = players.putIfAbsent(key, onlineUser);
             if (previous == null) {//put成功
                 try {

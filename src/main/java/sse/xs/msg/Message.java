@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import sse.xs.entity.UserInfo;
 import sse.xs.msg.data.*;
+import sse.xs.msg.data.response.AccountResponse;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -26,11 +27,12 @@ public class Message<T> {
     public static final int TYPE_TALK = 4;
     public static final int TYPE_MOVE = 5;
 
-    public static final int TYPE_GET_ROOM = 6;
+    public static final int TYPE_CREATE_ROOM = 6;
     public static final int TYPE_JOIN_ROOM = 7;
     public static final int TYPE_LEAVE_ROOM = 8;
+    public static final int TYPE_SWAP_ROOM = 9;
 
-    public static final int TYPE_STATICS = 9;
+    public static final int TYPE_STATICS = 10;
 
 
     public static final int TYPE_LOGIN_RESPONSE = 100;
@@ -42,16 +44,21 @@ public class Message<T> {
     private static HashMap<Integer, Class> classMaps = new HashMap<>();
 
     static {
-        classMaps.put(-1, ConnMsg.class);
-        classMaps.put(2, LogInMsg.class);
-        classMaps.put(-2, RegisterMsg.class);
-        classMaps.put(3, LogOutMsg.class);
+        classMaps.put(-1, ConnRequest.class);
+        classMaps.put(2, LogInRequest.class);
+        classMaps.put(-2, RegisterRequest.class);
+        classMaps.put(3, LogOutRequest.class);
 
 
-        classMaps.put(100, Response.class);
-        classMaps.put(101, Response.class);
-        classMaps.put(102, Response.class);
-        classMaps.put(103,Response.class);
+        classMaps.put(6,RoomRequest.class);
+        classMaps.put(7,RoomRequest.class);
+        classMaps.put(8,RoomRequest.class);
+        classMaps.put(9,RoomRequest.class);
+
+        classMaps.put(100, AccountResponse.class);
+        classMaps.put(101, AccountResponse.class);
+        classMaps.put(102, AccountResponse.class);
+        classMaps.put(103,AccountResponse.class);
     }
 
     public int type;
@@ -73,10 +80,10 @@ public class Message<T> {
     }
 
     public static Message createConnResp(String key){
-        Message<Response> message = new Message<>();
+        Message<AccountResponse> message = new Message<>();
         message.type = TYPE_CONN_RESPOSE;
         message.key = key;
-        message.data = new Response();
+        message.data = new AccountResponse();
         message.data.success = true;
         message.data.info = "ok";
         return message;
@@ -84,7 +91,7 @@ public class Message<T> {
 
     public static Message createConnMessage() {
         Message message = new Message();
-        ConnMsg connMsg = new ConnMsg();
+        ConnRequest connMsg = new ConnRequest();
         connMsg.state = 1;
         message.type = TYPE_CONN;
         message.data = connMsg;
@@ -93,7 +100,7 @@ public class Message<T> {
 
     public static Message createLoginMessage(UserInfo userInfo) {
         Message message = new Message();
-        LogInMsg msg = new LogInMsg();
+        LogInRequest msg = new LogInRequest();
         msg.info = userInfo;
         message.type = TYPE_LOG_IN;
         message.data = msg;
