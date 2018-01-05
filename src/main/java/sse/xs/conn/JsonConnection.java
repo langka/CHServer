@@ -22,7 +22,7 @@ public class JsonConnection {
 
     private JsonParser parser = new JsonParser();
 
-    public static JsonConnection createConnection(Socket socket){
+    public static JsonConnection createConnection(Socket socket) {
         try {
             return new JsonConnection(socket);
         } catch (IOException e) {
@@ -33,21 +33,26 @@ public class JsonConnection {
 
     private JsonConnection(Socket socket) throws IOException {
         this.socket = socket;
-        writer = new OutputStreamWriter(socket.getOutputStream(),"UTF-8");
-        reader = new InputStreamReader(socket.getInputStream(),"UTF-8");
+        writer = new OutputStreamWriter(socket.getOutputStream(), "UTF-8");
+        reader = new InputStreamReader(socket.getInputStream(), "UTF-8");
         jsonReader = new JsonReader(reader);
         jsonReader.setLenient(true);
     }
 
-    public JsonElement readJson() throws JsonIOException{
-        for(;;){
-            JsonElement element=parser.parse(jsonReader);
-            if(element!=null)
-            return element;
+    public JsonElement readJson() throws JsonIOException {
+        for (; ; ) {
+            JsonElement element = parser.parse(jsonReader);
+            if (element != null)
+                return element;
         }
     }
 
-    public Optional<JsonElement> readJsonNoException(){
+    public Message readMessage() throws JsonIOException {
+        JsonElement element = readJson();
+        return Message.getActualMessage(element).get();
+    }
+
+    public Optional<JsonElement> readJsonNoException() {
         try {
             JsonElement element = parser.parse(jsonReader);
             return Optional.of(element);
@@ -62,7 +67,7 @@ public class JsonConnection {
         writer.flush();
     }
 
-    public void close()  {
+    public void close() {
         try {
             socket.close();
         } catch (IOException e) {

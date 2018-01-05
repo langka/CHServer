@@ -1,0 +1,9 @@
+{"type":103,"key":"c9f74907-0b6c-43d7-86a6-3c2c1f7a5507","data":{"success":true,"info":"ok"}}
+
+{"type":100,"data":{"success":true,"info":"登陆成功！"}}
+
+{"type":300,"data":{"roomName":"happy!","roomKey":"4f0f73ea-4de1-4bad-84d9-dd792bf3dc97","success":true,"red":"c9f74907-0b6c-43d7-86a6-3c2c1f7a5507","type":6}}
+
+{"type":7,"key":"14f270db-5b1a-4c84-8c2f-970b68faa065","data":{"targetRoom":"4f0f73ea-4de1-4bad-84d9-dd792bf3dc97","degree":0}}
+
+{"type":300,"data":{"roomName":"happy!","roomKey":"4f0f73ea-4de1-4bad-84d9-dd792bf3dc97","success":true,"red":"c9f74907-0b6c-43d7-86a6-3c2c1f7a5507","black":"14f270db-5b1a-4c84-8c2f-970b68faa065","type":8}}

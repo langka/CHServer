@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import sse.xs.entity.UserInfo;
 import sse.xs.msg.data.*;
 import sse.xs.msg.data.response.AccountResponse;
+import sse.xs.msg.data.response.RoomResponse;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -38,8 +39,13 @@ public class Message<T> {
     public static final int TYPE_LOGIN_RESPONSE = 100;
     public static final int TYPE_LOGOUT_RESPONSE = 101;
     public static final int TYPE_REGISTER_RESPONSE = 102;
-    public static final int TYPE_CONN_RESPOSE = 103;
+    public static final int TYPE_CONN_RESPONSE = 103;
 
+    public static final int TYPE_START_GAME = 200;
+    public static final int TYPE_END_GAME = 201;
+
+
+    public static final int TYPE_ROOM_RESPONSE = 300;
 
     private static HashMap<Integer, Class> classMaps = new HashMap<>();
 
@@ -49,16 +55,18 @@ public class Message<T> {
         classMaps.put(-2, RegisterRequest.class);
         classMaps.put(3, LogOutRequest.class);
 
-
-        classMaps.put(6,RoomRequest.class);
-        classMaps.put(7,RoomRequest.class);
-        classMaps.put(8,RoomRequest.class);
-        classMaps.put(9,RoomRequest.class);
+        classMaps.put(6, RoomRequest.class);
+        classMaps.put(7, RoomRequest.class);
+        classMaps.put(8, RoomRequest.class);
+        classMaps.put(9, RoomRequest.class);
 
         classMaps.put(100, AccountResponse.class);
         classMaps.put(101, AccountResponse.class);
         classMaps.put(102, AccountResponse.class);
-        classMaps.put(103,AccountResponse.class);
+        classMaps.put(103, AccountResponse.class);
+
+        classMaps.put(300, RoomResponse.class);
+
     }
 
     public int type;
@@ -79,9 +87,9 @@ public class Message<T> {
         return message;
     }
 
-    public static Message createConnResp(String key){
+    public static Message createConnResp(String key) {
         Message<AccountResponse> message = new Message<>();
-        message.type = TYPE_CONN_RESPOSE;
+        message.type = TYPE_CONN_RESPONSE;
         message.key = key;
         message.data = new AccountResponse();
         message.data.success = true;
@@ -108,6 +116,39 @@ public class Message<T> {
 
     }
 
+    public static Message createCreateRoomRequest(String key, String name, int degree, String pwd) {
+        Message message = new Message();
+        message.key = key;
+        message.type = Message.TYPE_CREATE_ROOM;
+        RoomRequest request = new RoomRequest();
+        request.name = name;
+        request.password = pwd;
+        request.degree = degree;
+        message.data = request;
+        return message;
+
+    }
+
+    public static Message createJoinRoomRequest(String roomKey,String mKey){
+        Message message = new Message();
+        message.key = mKey;
+        message.type = Message.TYPE_JOIN_ROOM;
+        RoomRequest request = new RoomRequest();
+        request.targetRoom = roomKey;
+        message.data = request;
+        return message;
+    }
+
+    public static Message createLeaveRoomRequest(String roomKey, String mKey) {
+        Message message = new Message();
+        message.key = mKey;
+        message.type = Message.TYPE_LEAVE_ROOM;
+        RoomRequest request = new RoomRequest();
+        request.targetRoom = roomKey;
+        message.data = request;
+        return message;
+    }
+
     public static ParameterizedType generateType(final Type... args) {
         return new ParameterizedType() {
             public Type getRawType() {
@@ -130,15 +171,15 @@ public class Message<T> {
     public static Optional<Message> getActualMessage(JsonElement element) {
         Message received = gson.fromJson(element, Message.class);
         Class clazz = classMaps.get(received.type);
-        if(clazz==null)
+        if (clazz == null)
             return Optional.empty();
-        return Optional.of(gson.fromJson(element,generateType(clazz)));
+        return Optional.of(gson.fromJson(element, generateType(clazz)));
     }
 
     @Override
     public String toString() {
         Class clazz = classMaps.get(type);
         ParameterizedType parameterizedType = generateType(clazz);
-        return gson.toJson(this,parameterizedType);
+        return gson.toJson(this, parameterizedType);
     }
 }

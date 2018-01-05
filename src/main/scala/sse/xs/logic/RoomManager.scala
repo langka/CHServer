@@ -17,7 +17,7 @@ import scala.annotation.tailrec
   * Email:xusongnice@gmail.com
   */
 class RoomManager(server: Server) {
-  val rooms: ConcurrentHashMap[String, Room] = ConcurrentHashMap[String, Room]
+  val rooms: ConcurrentHashMap[String, Room] = new ConcurrentHashMap[String, Room]
   val enterF: (Room, String) => Int = _.enter(_)
   val leaveF: (Room, String) => Int = _.leave(_)
   val swapF: (Room, String) => Int = (r, s) => r.swap()
@@ -38,30 +38,29 @@ class RoomManager(server: Server) {
     val room = new Room(name = name, degree = roomRequest.degree, pwd = pwd, master = message.key)
     val roomKey = createRoom(room)
     room.roomKey = roomKey
-    val msg = getResponse(room, Message.TYPE_CREATE_ROOM)
+    val msg = getResponse(room, Message.TYPE_ROOM_RESPONSE,Message.TYPE_CREATE_ROOM)
     sendToRoom(roomKey, msg.toString)
   }
 
   private def dealSwap(message: Message[RoomRequest]): Unit = {
     val result = swap(message.data.targetRoom, null)
-    val msg = getResponse(getRoom(message.data.targetRoom), Message.TYPE_SWAP_ROOM)
+    val msg = getResponse(getRoom(message.data.targetRoom), Message.TYPE_ROOM_RESPONSE,Message.TYPE_SWAP_ROOM)
     sendToRoom(message.data.targetRoom, msg.toString)
   }
-
 
   private def dealEnter(message: Message[RoomRequest]): Unit = {
     val result = enterRoom(message.data.targetRoom, message.key)
     if (result != 0) {
       val room = rooms.get(message.data.targetRoom)
-      val msg = getResponse(room, Message.TYPE_JOIN_ROOM)
-      sendToRoom(message.data.targetRoom, message.key)
+      val msg = getResponse(room, Message.TYPE_ROOM_RESPONSE,Message.TYPE_JOIN_ROOM)
+      sendToRoom(message.data.targetRoom, message.toString)
     }
   }
 
 
   def dealLeave(message: Message[RoomRequest]): Unit = {
     val room = rooms.get(message.data.targetRoom)
-    val msg = getResponse(room, Message.TYPE_LEAVE_ROOM)
+    val msg = getResponse(room, Message.TYPE_ROOM_RESPONSE,Message.TYPE_LEAVE_ROOM)
     if (room.master == message.key) {
       //destroy the room
       rooms.remove(room.roomKey)
@@ -121,11 +120,18 @@ class RoomManager(server: Server) {
     }
   }
 
-  private def getResponse(room: Room, tp: Int): Message[RoomResponse] = {
+  /**
+    *
+    * @param room
+    * @param tp 指示序列化的类，稳定为 RoomResponse.class
+    * @param actualTp 指示具体的操作
+    * @return
+    */
+  private def getResponse(room: Room, tp: Int,actualTp:Int): Message[RoomResponse] = {
     val response = new RoomResponse
     val msg = new Message[RoomResponse]
     msg.`type` = tp
-    response.`type` = tp
+    response.`type` = actualTp
     response.roomKey = room.roomKey
     response.red = room.red
     response.black = room.black
