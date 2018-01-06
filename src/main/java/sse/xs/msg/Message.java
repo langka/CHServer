@@ -25,9 +25,6 @@ public class Message<T> {
     public static final int TYPE_LOG_IN = 2;
     public static final int TYPE_LOG_OUT = 3;
 
-    public static final int TYPE_TALK = 4;
-    public static final int TYPE_MOVE = 5;
-
     public static final int TYPE_CREATE_ROOM = 6;
     public static final int TYPE_JOIN_ROOM = 7;
     public static final int TYPE_LEAVE_ROOM = 8;
@@ -46,6 +43,12 @@ public class Message<T> {
 
 
     public static final int TYPE_ROOM_RESPONSE = 300;
+    public static final int TYPE_ROOM_MSG = 301;
+
+    public static final int TYPE_GAME_REQUEST = 400;
+    public static final int TYPE_GAME_RESPONSE = 401;
+    public static final int TYPE_MOVE_REQUEST = 402;
+    public static final int TYPE_MOVE_RESPONSE = 403;
 
     private static HashMap<Integer, Class> classMaps = new HashMap<>();
 
@@ -129,7 +132,7 @@ public class Message<T> {
 
     }
 
-    public static Message createJoinRoomRequest(String roomKey,String mKey){
+    public static Message createJoinRoomRequest(String roomKey, String mKey) {
         Message message = new Message();
         message.key = mKey;
         message.type = Message.TYPE_JOIN_ROOM;

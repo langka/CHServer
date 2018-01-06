@@ -19,7 +19,7 @@ import scala.annotation.tailrec
 class RoomManager(server: Server) {
   val rooms: ConcurrentHashMap[String, Room] = new ConcurrentHashMap[String, Room]
   val enterF: (Room, String) => Int = _.enter(_)
-  val leaveF: (Room, String) => Int = _.leave(_)
+  val leaveF: (Room, String) => Int = (r, s) => if (r == null) 0 else r.leave(s)
   val swapF: (Room, String) => Int = (r, s) => r.swap()
 
   def handleRoomMessage(message: Message[RoomRequest]): Unit = {
@@ -38,29 +38,33 @@ class RoomManager(server: Server) {
     val room = new Room(name = name, degree = roomRequest.degree, pwd = pwd, master = message.key)
     val roomKey = createRoom(room)
     room.roomKey = roomKey
-    val msg = getResponse(room, Message.TYPE_ROOM_RESPONSE,Message.TYPE_CREATE_ROOM)
+    val msg = getResponse(room, Message.TYPE_ROOM_RESPONSE, Message.TYPE_CREATE_ROOM)
     sendToRoom(roomKey, msg.toString)
   }
 
   private def dealSwap(message: Message[RoomRequest]): Unit = {
     val result = swap(message.data.targetRoom, null)
-    val msg = getResponse(getRoom(message.data.targetRoom), Message.TYPE_ROOM_RESPONSE,Message.TYPE_SWAP_ROOM)
+    val msg = getResponse(getRoom(message.data.targetRoom), Message.TYPE_ROOM_RESPONSE, Message.TYPE_SWAP_ROOM)
     sendToRoom(message.data.targetRoom, msg.toString)
   }
 
   private def dealEnter(message: Message[RoomRequest]): Unit = {
     val result = enterRoom(message.data.targetRoom, message.key)
+    val room = rooms.get(message.data.targetRoom)
     if (result != 0) {
-      val room = rooms.get(message.data.targetRoom)
-      val msg = getResponse(room, Message.TYPE_ROOM_RESPONSE,Message.TYPE_JOIN_ROOM)
+      val msg = getResponse(room, Message.TYPE_ROOM_RESPONSE, Message.TYPE_JOIN_ROOM)
       sendToRoom(message.data.targetRoom, message.toString)
+    } else {
+      //房间加入失败
+      val msg = getResponse(room, Message.TYPE_ROOM_RESPONSE, Message.TYPE_JOIN_ROOM, success = false)
+      server.getSender.sendMessage(msg.toString, message.key)
     }
   }
 
 
   def dealLeave(message: Message[RoomRequest]): Unit = {
     val room = rooms.get(message.data.targetRoom)
-    val msg = getResponse(room, Message.TYPE_ROOM_RESPONSE,Message.TYPE_LEAVE_ROOM)
+    val msg = getResponse(room, Message.TYPE_ROOM_RESPONSE, Message.TYPE_LEAVE_ROOM)
     if (room.master == message.key) {
       //destroy the room
       rooms.remove(room.roomKey)
@@ -74,7 +78,12 @@ class RoomManager(server: Server) {
       if (result != 0) {
         server.getSender.sendMessage(str, red)
         server.getSender.sendMessage(str, black)
+      } else {
+        //离开这个房间fail：reason：房间失效  reason:不在这个房间
+        val fail = getResponse(room, Message.TYPE_ROOM_RESPONSE, Message.TYPE_LEAVE_ROOM, success = false)
+        server.getSender.sendMessage(false.toString, message.key)
       }
+
     }
   }
 
@@ -123,11 +132,11 @@ class RoomManager(server: Server) {
   /**
     *
     * @param room
-    * @param tp 指示序列化的类，稳定为 RoomResponse.class
+    * @param tp       指示序列化的类，稳定为 RoomResponse.class
     * @param actualTp 指示具体的操作
     * @return
     */
-  private def getResponse(room: Room, tp: Int,actualTp:Int): Message[RoomResponse] = {
+  private def getResponse(room: Room, tp: Int, actualTp: Int, success: Boolean = true): Message[RoomResponse] = {
     val response = new RoomResponse
     val msg = new Message[RoomResponse]
     msg.`type` = tp
@@ -135,7 +144,7 @@ class RoomManager(server: Server) {
     response.roomKey = room.roomKey
     response.red = room.red
     response.black = room.black
-    response.success = true
+    response.success = success
     response.roomName = room.name
     msg.data = response
     msg
@@ -148,6 +157,8 @@ class Room(var name: String, var degree: Int = 0, pwd: String = null, val master
   var red: String = master
   val lock = new ReentrantLock
   var roomKey: String = _
+  val game = new Game(this)
+
 
   def swap(): Int = {
     val temp = black
