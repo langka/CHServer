@@ -11,5 +11,6 @@ public class MoveResponse {
     public int toX;
     public int toY;
     public boolean success;
+    public String info;
 
 }

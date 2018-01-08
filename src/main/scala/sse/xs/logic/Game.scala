@@ -65,7 +65,8 @@ class Game(room: Room) {
         val from = Pos(request.data.fromX, request.data.fromY)
         val to = Pos(request.data.toX, request.data.toY)
         moveStep(Step(from, to, request.key))
-      } else {
+      } else {//不是我的回合
+        // TODO: 发送消息
         null
       }
     }
@@ -80,7 +81,16 @@ class Game(room: Room) {
     } else {
       val piece = checkerboard(step.from.x)(step.from.y).asInstanceOf[Piece]
       if (piece.red == isRed) {
-
+        //颜色对了 走的是自己的棋子
+        val f: (Int, Int) => Pie = (a, b) => checkerboard(a)(b)
+        implicit def intToF3(status: Int): (Pos, Pos, Boolean) => Boolean = (x, y, b) => MoveLaws.laws(status)(x, y, b, f)
+        // TODO: 完成正确的移动/胜负判定以及发送消息
+        if (canMove(step.from, step.to, piece.red, piece.status)) {
+          null
+        } else {
+          val msg = failMoveMessage()
+          (List(step.mover), msg)
+        }
       } else {
         //棋子颜色不对
         val msg = failMoveMessage()
@@ -92,11 +102,12 @@ class Game(room: Room) {
   private def canMove(f: Pos, t: Pos, red: Boolean, law: (Pos, Pos, Boolean) => Boolean) = law(f, t, red)
 
 
-  private def failMoveMessage(): Message[MoveResponse] = {
+  private def failMoveMessage(info:String = null): Message[MoveResponse] = {
     val message = new Message[MoveResponse]
     message.`type` = Message.TYPE_MOVE_RESPONSE
     val data = new MoveResponse
     data.success = false
+    data.info = info
     message.data = data
     message
   }
@@ -125,7 +136,7 @@ class Game(room: Room) {
     for (i <- 0 to 9) pieces(i) = Blank
   }
 
-  private def resetPieces(): Unit = {
+   def resetPieces(): Unit = {
     checkerboard foreach cleanPieces
     resetSoldiers()
     resetCannon()
@@ -164,7 +175,7 @@ class Game(room: Room) {
     pieces.foldLeft("")(_ + _.toString)
   }
 
-  private def printChessBoardInConsole(): Unit = {
+   def printChessBoardInConsole(): Unit = {
     val lines = for {
       a <- 0 to 9
     } yield getLineStr(a)
@@ -183,11 +194,13 @@ case class Pos(x: Int, y: Int) {
 
   def distance(that: Pos): (Int, Int) = (x - that.x, y - that.y)
 
+  def absDistance(that: Pos): (Int, Int) = (Math.abs(x - that.x), Math.abs(y - that.y))
+
 }
 
 case object MoveLaws {
 
-  def soldierLaw(x: Pos, y: Pos, b: Boolean)(implicit f: (Int, Int) => Pie): Boolean = {
+  def soldierLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
     if ((x - y) != 1)
       false
     else {
@@ -223,7 +236,7 @@ case object MoveLaws {
 
   }
 
-  def cannonLaw(x: Pos, y: Pos, b: Boolean)(implicit f: (Int, Int) => Pie): Boolean = {
+  def cannonLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
     if ((x - y) == 0) //不动
       false
     else if (f(y.x, y.y).isRed == b) false
@@ -238,12 +251,12 @@ case object MoveLaws {
         if (xd == 0) {
           //竖直移动
           val range = if (yd > 0) x.y + 1 until y.y else y.y + 1 until x.y
-          val pieces=for(i<-range) yield f(x.x,i)
-          pieces.exists(!_.isEmpty)//中间是否有 《山》
+          val pieces = for (i <- range) yield f(x.x, i)
+          pieces.exists(!_.isEmpty) //中间是否有 《山》
         } else {
           //左右移动
-          val range = if(xd>0) x.x+1 until y.x else y.x+1 until x.x
-          val pieces = for(i<-range) yield f(i,x.y)
+          val range = if (xd > 0) x.x + 1 until y.x else y.x + 1 until x.x
+          val pieces = for (i <- range) yield f(i, x.y)
           pieces.exists(!_.isEmpty)
         }
       }
@@ -251,7 +264,87 @@ case object MoveLaws {
     }
   }
 
-  val map = Map(0 -> soldierLaw _,1 -> cannonLaw _)
+  def vehicleLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
+    if ((x - y) == 0) //不动
+      false
+    else if (f(y.x, y.y).isRed == b) false
+    else if (f(y.x, y.y).isBlack == (!b)) false //吃自己
+    else if (x mixed y) false //不能斜着走
+    else true
+  }
+
+  def horseLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
+    if ((x - y) != 3)
+      false
+    else if (f(y.x, y.y).isRed == b) false
+    else if (f(y.x, y.y).isBlack == (!b)) false
+    else {
+      y distance x match {
+        case (2, 1) | (2, -1) => f(x.x + 1, x.y).isEmpty
+        case (-2, 1) | (-2, -1) => f(x.x - 1, x.y).isEmpty
+        case (1, 2) | (-1, 2) => f(x.x, x.y + 1).isEmpty
+        case (1, -2) | (-1, -2) => f(x.x, x.y - 1).isEmpty
+        case _ => false //0,3 错误走法
+      }
+    }
+
+  }
+
+
+  def elephantLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
+    if (b && y.y <= 4) //相不允许过河
+      false
+    else if (!b && y.y >= 5)
+      false
+    else if (f(y.x, y.y).isRed == b) false
+    else if (f(y.x, y.y).isBlack == (!b)) false
+    else y distance x match {
+      case (2, 2) => f(x.x + 1, x.y + 1).isEmpty
+      case (2, -2) => f(x.x + 1, x.y - 1).isEmpty
+      case (-2, 2) => f(x.x - 1, x.y + 1).isEmpty
+      case (-2, -2) => f(x.x - 1, x.y - 1).isEmpty
+      case _ => false
+    }
+  }
+
+  def guardLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
+    if (y.x < 3 || y.x > 5) //左右越界
+      false
+    else if (b && y.y <= 6)
+      false
+    else if (!b && y.y >= 3)
+      false
+    else if (f(y.x, y.y).isRed == b) false
+    else if (f(y.x, y.y).isBlack == (!b)) false
+    else {
+      y distance x match {
+        case (1, -1) | (1, 1) | (-1, 1) | (-1, -1) => true
+        case _ => false
+      }
+    }
+  }
+
+  def generalLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
+    if (y.x < 3 || y.x > 5) //左右越界
+      false
+    else if (b && y.y <= 6) //上下越界
+      false
+    else if (!b && y.y >= 3)
+      false
+    else if (f(y.x, y.y).isRed == b) false //吃自己
+    else if (f(y.x, y.y).isBlack == (!b)) false
+    else (y - x) == 1
+  }
+
+  val laws: Map[Int, (Pos, Pos, Boolean, (Int, Int) => Pie) => Boolean] = Map(
+    0 -> soldierLaw _,
+    1 -> cannonLaw _,
+    2 -> vehicleLaw _,
+    3 -> horseLaw _,
+    4 -> elephantLaw _,
+    5 -> guardLaw _,
+    6 -> generalLaw _
+  )
 }
 
 
@@ -283,7 +376,6 @@ case class Piece(red: Boolean, status: Int) extends Pie(true) {
   override def isEmpty: Boolean = false
 }
 
-
 case object Pieces {
   val soldier = 0
   val cannon = 1
@@ -292,6 +384,5 @@ case object Pieces {
   val elephant = 4
   val guard = 5
   val general = 6
-
 }
 
