@@ -38,10 +38,6 @@ public class Message<T> {
     public static final int TYPE_REGISTER_RESPONSE = 102;
     public static final int TYPE_CONN_RESPONSE = 103;
 
-    public static final int TYPE_START_GAME = 200;
-    public static final int TYPE_END_GAME = 201;
-
-
     public static final int TYPE_ROOM_RESPONSE = 300;
     public static final int TYPE_ROOM_MSG = 301;
 

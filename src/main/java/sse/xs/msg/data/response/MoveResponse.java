@@ -6,4 +6,10 @@ package sse.xs.msg.data.response;
  * Email:xusongnice@gmail.com
  */
 public class MoveResponse {
+    public int fromX;
+    public int fromY;
+    public int toX;
+    public int toY;
+    public boolean success;
+
 }

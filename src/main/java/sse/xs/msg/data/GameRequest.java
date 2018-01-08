@@ -7,4 +7,5 @@ package sse.xs.msg.data;
  * start,end
  */
 public class GameRequest {
+    public int type;//1 开始比赛 2结束比赛
 }

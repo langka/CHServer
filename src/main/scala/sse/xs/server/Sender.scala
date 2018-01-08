@@ -27,11 +27,6 @@ class Sender(server: Server) {
 
 }
 object Sender extends App{
-  val x= 3
-  val y = 7
-  println(7/3)
-  val line =0 to 8 by 2
-  println(line)
-  val z=for(a<-line) yield 3
-  println(z)
+  val y = 1 until 1
+  println(y)
 }

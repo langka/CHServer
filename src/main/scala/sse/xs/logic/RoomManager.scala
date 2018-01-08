@@ -7,7 +7,7 @@ import java.util.concurrent.locks.ReentrantLock
 import sse.xs.msg.Message
 import sse.xs.msg.data.RoomRequest
 import sse.xs.msg.data.response.RoomResponse
-import sse.xs.server.Server
+import sse.xs.server.{Sender, Server}
 
 import scala.annotation.tailrec
 
@@ -35,7 +35,7 @@ class RoomManager(server: Server) {
     val roomRequest = message.data
     val name = if (roomRequest.name == "" || roomRequest.name == null) "快来一起战斗吧!" else roomRequest.name
     val pwd = if (roomRequest.password == "" || roomRequest.password == null) null else roomRequest.password
-    val room = new Room(name = name, degree = roomRequest.degree, pwd = pwd, master = message.key)
+    val room = new Room(name = name, degree = roomRequest.degree, pwd = pwd, master = message.key,server.getSender)
     val roomKey = createRoom(room)
     room.roomKey = roomKey
     val msg = getResponse(room, Message.TYPE_ROOM_RESPONSE, Message.TYPE_CREATE_ROOM)
@@ -152,13 +152,12 @@ class RoomManager(server: Server) {
 
 }
 
-class Room(var name: String, var degree: Int = 0, pwd: String = null, val master: String) {
-  var black: String = _
-  var red: String = master
+class Room(var name: String, var degree: Int = 0, pwd: String = null, val master: String,val sender:Sender) {
+  @volatile var black: String = _
+  @volatile var red: String = master
   val lock = new ReentrantLock
   var roomKey: String = _
   val game = new Game(this)
-
 
   def swap(): Int = {
     val temp = black
