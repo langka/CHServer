@@ -1,5 +1,7 @@
 package sse.xs.logic
 
+import java.util.Scanner
+
 import sse.xs.msg.Message
 import sse.xs.msg.data.{GameRequest, MoveRequest}
 import sse.xs.msg.data.response.{GameResponse, MoveResponse}
@@ -30,6 +32,12 @@ class Game(room: Room) {
       val m = request.asInstanceOf[Message[GameRequest]]
       if (m.data.`type` == 1) startMessage(m) else endMessage(m)
     case Message.TYPE_MOVE_REQUEST => moveMessage(request.asInstanceOf[Message[MoveRequest]])
+  }
+
+  private def moveForTest(from: Pos, to: Pos): Unit = {
+    checkerboard(to.x)(to.y) = checkerboard(from.x)(from.y)
+    checkerboard(from.x)(from.y) = Blank
+    redTurn = !redTurn
   }
 
   def startMessage(request: Message[GameRequest]): Future[(List[String], Message[GameResponse])] = {
@@ -65,7 +73,8 @@ class Game(room: Room) {
         val from = Pos(request.data.fromX, request.data.fromY)
         val to = Pos(request.data.toX, request.data.toY)
         moveStep(Step(from, to, request.key))
-      } else {//不是我的回合
+      } else {
+        //不是我的回合
         // TODO: 发送消息
         null
       }
@@ -83,7 +92,9 @@ class Game(room: Room) {
       if (piece.red == isRed) {
         //颜色对了 走的是自己的棋子
         val f: (Int, Int) => Pie = (a, b) => checkerboard(a)(b)
+
         implicit def intToF3(status: Int): (Pos, Pos, Boolean) => Boolean = (x, y, b) => MoveLaws.laws(status)(x, y, b, f)
+
         // TODO: 完成正确的移动/胜负判定以及发送消息
         if (canMove(step.from, step.to, piece.red, piece.status)) {
           null
@@ -102,7 +113,7 @@ class Game(room: Room) {
   private def canMove(f: Pos, t: Pos, red: Boolean, law: (Pos, Pos, Boolean) => Boolean) = law(f, t, red)
 
 
-  private def failMoveMessage(info:String = null): Message[MoveResponse] = {
+  private def failMoveMessage(info: String = null): Message[MoveResponse] = {
     val message = new Message[MoveResponse]
     message.`type` = Message.TYPE_MOVE_RESPONSE
     val data = new MoveResponse
@@ -136,7 +147,7 @@ class Game(room: Room) {
     for (i <- 0 to 9) pieces(i) = Blank
   }
 
-   def resetPieces(): Unit = {
+  def resetPieces(): Unit = {
     checkerboard foreach cleanPieces
     resetSoldiers()
     resetCannon()
@@ -161,7 +172,7 @@ class Game(room: Room) {
 
   private def resetGuard(): Unit = reset(Pieces.guard, List(3, 5), List(0, 9), 9)
 
-  private def resetGeneral(): Unit = reset(Pieces.guard, List(4), List(0, 9), 9)
+  private def resetGeneral(): Unit = reset(Pieces.general, List(4), List(0, 9), 9)
 
   private def reset(status: Int, line: List[Int], row: List[Int], f: Int => Boolean): Unit = {
     for {
@@ -175,12 +186,15 @@ class Game(room: Room) {
     pieces.foldLeft("")(_ + _.toString)
   }
 
-   def printChessBoardInConsole(): Unit = {
+  def printChessBoardInConsole(): Unit = {
+    println("##########################")
     val lines = for {
       a <- 0 to 9
     } yield getLineStr(a)
     lines foreach println
+    println("##########################")
   }
+
 
 }
 
@@ -200,9 +214,23 @@ case class Pos(x: Int, y: Int) {
 
 case object MoveLaws {
 
+  //检查是否吃了自己
+  private def checkSelfEat(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
+    val piece = f(y.x, y.y)
+    if (piece.isEmpty) false //目标地点没子，不会吃自己
+    else {
+      if (piece.isRed == b)
+        true
+      else if (piece.isBlack == (!b))
+        true
+      else false
+    }
+  }
+
   def soldierLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
     if ((x - y) != 1)
       false
+    else if (checkSelfEat(x, y, b, f)) false
     else {
       if (b) {
         //红色
@@ -239,45 +267,51 @@ case object MoveLaws {
   def cannonLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
     if ((x - y) == 0) //不动
       false
-    else if (f(y.x, y.y).isRed == b) false
-    else if (f(y.x, y.y).isBlack == (!b)) false
+    else if (checkSelfEat(x, y, b, f)) false
     else if (x mixed y) false
     else {
-      //没有吃自己,也没有斜着走
-      if (f(y.x, y.y).isEmpty) true //正常移动
-      else {
-        //吃子
-        val (xd, yd) = y distance x
-        if (xd == 0) {
-          //竖直移动
-          val range = if (yd > 0) x.y + 1 until y.y else y.y + 1 until x.y
-          val pieces = for (i <- range) yield f(x.x, i)
-          pieces.exists(!_.isEmpty) //中间是否有 《山》
-        } else {
-          //左右移动
-          val range = if (xd > 0) x.x + 1 until y.x else y.x + 1 until x.x
-          val pieces = for (i <- range) yield f(i, x.y)
-          pieces.exists(!_.isEmpty)
-        }
+      val target = f(y.x,y.y)
+      val count = if(target.isEmpty) 0 else 1
+      val (xd, yd) = y distance x
+      val pieces=if (xd == 0) {
+        //竖直移动
+        val range = if (yd > 0) x.y + 1 until y.y else y.y + 1 until x.y
+        for (i <- range) yield f(x.x, i)
+      } else {
+        //左右移动
+        val range = if (xd > 0) x.x + 1 until y.x else y.x + 1 until x.x
+        for (i <- range) yield f(i, x.y)
       }
-
+      pieces.count(_ != Blank)==count
     }
   }
 
   def vehicleLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
     if ((x - y) == 0) //不动
       false
-    else if (f(y.x, y.y).isRed == b) false
-    else if (f(y.x, y.y).isBlack == (!b)) false //吃自己
+    else if (checkSelfEat(x, y, b, f)) false
     else if (x mixed y) false //不能斜着走
-    else true
+    else {
+      val (xd, yd) = y distance x
+      val pieces=if (xd == 0) {
+        //竖直移动
+        val range = if (yd > 0) x.y + 1 until y.y else y.y + 1 until x.y
+        for (i <- range) yield f(x.x, i)
+      } else {
+        //左右移动
+        val range = if (xd > 0) x.x + 1 until y.x else y.x + 1 until x.x
+        for (i <- range) yield f(i, x.y)
+      }
+      !pieces.exists(_ != Blank)//不允许跨过其他单位
+    }
+
   }
+
 
   def horseLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
     if ((x - y) != 3)
       false
-    else if (f(y.x, y.y).isRed == b) false
-    else if (f(y.x, y.y).isBlack == (!b)) false
+    else if (checkSelfEat(x, y, b, f)) false
     else {
       y distance x match {
         case (2, 1) | (2, -1) => f(x.x + 1, x.y).isEmpty
@@ -296,8 +330,7 @@ case object MoveLaws {
       false
     else if (!b && y.y >= 5)
       false
-    else if (f(y.x, y.y).isRed == b) false
-    else if (f(y.x, y.y).isBlack == (!b)) false
+    else if (checkSelfEat(x, y, b, f)) false
     else y distance x match {
       case (2, 2) => f(x.x + 1, x.y + 1).isEmpty
       case (2, -2) => f(x.x + 1, x.y - 1).isEmpty
@@ -307,6 +340,14 @@ case object MoveLaws {
     }
   }
 
+  /**
+    *
+    * @param x
+    * @param y
+    * @param b 友军棋子颜色
+    * @param f
+    * @return
+    */
   def guardLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
     if (y.x < 3 || y.x > 5) //左右越界
       false
@@ -314,8 +355,7 @@ case object MoveLaws {
       false
     else if (!b && y.y >= 3)
       false
-    else if (f(y.x, y.y).isRed == b) false
-    else if (f(y.x, y.y).isBlack == (!b)) false
+    else if (checkSelfEat(x, y, b, f)) false
     else {
       y distance x match {
         case (1, -1) | (1, 1) | (-1, 1) | (-1, -1) => true
@@ -331,8 +371,7 @@ case object MoveLaws {
       false
     else if (!b && y.y >= 3)
       false
-    else if (f(y.x, y.y).isRed == b) false //吃自己
-    else if (f(y.x, y.y).isBlack == (!b)) false
+    else if (checkSelfEat(x, y, b, f)) false
     else (y - x) == 1
   }
 
@@ -347,9 +386,51 @@ case object MoveLaws {
   )
 }
 
+object Game extends App {
+  val game = new Game(new Room(null, 3, null, null, null))
+  game.resetPieces()
+  game.printChessBoardInConsole()
+  var end = false
+  while (!end) {
+    println("输入移动：")
+    val scanner = new Scanner(System.in)
+    val str = scanner.nextLine()
+    val f: (Int, Int) => Pie = (a, b) => game.checkerboard(a)(b)
+
+    implicit def toPos(a: String): Pos = {
+      val p = a.split(",")
+      Pos(p(0).toInt, p(1).toInt)
+    }
+
+    if (str == "end") {
+      end = true
+    } else {
+      val poss = str.split("#")
+      if (poss.size == 1) {
+        val piece = f(poss(0).x, poss(0).y)
+        println(piece.info)
+      } else {
+        val piece = game.checkerboard(poss(0).x)(poss(0).y).asInstanceOf[Piece]
+
+        implicit def intToF3(status: Int): (Pos, Pos, Boolean) => Boolean = (x, y, b) => MoveLaws.laws(status)(x, y, b, f)
+
+        if (game.canMove(poss(0), poss(1), piece.red, piece.status)) {
+          println("合法移动！")
+          game.moveForTest(poss(0), poss(1))
+          game.printChessBoardInConsole()
+        } else {
+          println("非法移动！")
+        }
+      }
+    }
+  }
+  println("game ended")
+}
 
 abstract class Pie(chess: Boolean) {
   def isRed: Boolean
+
+  def info: String
 
   def isEmpty: Boolean
 
@@ -364,6 +445,8 @@ case object Blank extends Pie(false) {
   override def isBlack: Boolean = false
 
   override def isEmpty: Boolean = true
+
+  override def info: String = "Blank"
 }
 
 case class Piece(red: Boolean, status: Int) extends Pie(true) {
@@ -374,6 +457,8 @@ case class Piece(red: Boolean, status: Int) extends Pie(true) {
   override def isBlack: Boolean = !red
 
   override def isEmpty: Boolean = false
+
+  override def info: String = "color:" + (if (isRed) "red" else "black") + "state:" + status
 }
 
 case object Pieces {
