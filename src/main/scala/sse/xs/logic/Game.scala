@@ -3,7 +3,7 @@ package sse.xs.logic
 import java.util.Scanner
 
 import sse.xs.msg.Message
-import sse.xs.msg.data.{GameRequest, MoveRequest}
+import sse.xs.msg.data.{GameRequest, MoveRequest, TurnChangeMsg}
 import sse.xs.msg.data.response.{GameResponse, MoveResponse}
 import sse.xs.server.Sender
 
@@ -19,28 +19,106 @@ class Game(room: Room) {
 
   @volatile var redTurn = true
   @volatile var state = 0
+  @volatile var count = 0
   //0未开始 1游戏中 2结束
+
   val sender: Sender = room.sender
   val checkerboard: Array[Array[Pie]] = new Array[Array[Pie]](9) map (x => new Array[Pie](10))
+  val f: (Int, Int) => Pie = (a, b) => checkerboard(a)(b)
 
-  def handleGameMessage(request: Message[_]): Unit = getMessage(request) onSuccess {
-    case e => e._1 foreach (x => sender.sendMessage(e._2.toString, x))
+  implicit def intToF2(status: Int): (Pos, Pos) => Boolean = (x, y) => MoveLaws.laws(status)(x, y, f)
+
+  def handleGameMessage(request: Message[_]): Unit = getMessage(request) filter {
+    e =>
+      e._1 foreach (x => sender.sendMessageSync(e._2.toString, x))
+      e._3
+  } onSuccess {
+    case e => println("board get changed!")
+      val state = isInDangerOrDead()
+      val turnChange = new TurnChangeMsg(state)
+      val m = createTurnMessage(turnChange)
+      List(room.red, room.black) foreach (x => sender.sendMessageSync(m.toString, x))
+      if(state==3||state==4)
+        this.state = 2
   }
 
-  def getMessage(request: Message[_]): Future[(List[String], Message[_])] = request.`type` match {
+  private def createTurnMessage(turn: TurnChangeMsg) = {
+    val msg = new Message[TurnChangeMsg]
+    msg.`type` = Message.TYPE_TURN_CHANGE
+    msg.data = turn
+    msg
+  }
+
+
+  private def redBossLocation(): Option[(Int, Int)] = {
+    val list = for {
+      i <- 3 to 5
+      j <- 7 to 9
+      if checkerboard(i)(j).status == 6
+    } yield (i, j)
+    if (list.isEmpty) None
+    else Some(list(0))
+  }
+
+  private def blackBossLocation(): Option[(Int, Int)] = {
+    val list = for {
+      i <- 3 to 5
+      j <- 0 to 2
+      if checkerboard(i)(j).status == 6
+    } yield (i, j)
+    if (list.isEmpty) None
+    else Some(list(0))
+  }
+
+  //1 红色将军 2 黑色将军 3 红色胜利 4 黑色胜利 5 无事发生
+
+  //redTurn已经改变，指示着下一个下棋的人了
+  private def isInDangerOrDead(): Int = {
+    val r = redBossLocation()
+    val b = blackBossLocation()
+    if (r.isEmpty)
+      4
+    else if (b.isEmpty)
+      3
+    else {
+      val list = for (i <- r.get._2 - 1 to b.get._2 + 1) yield checkerboard(r.get._1)(i)
+      if (r.get._1 == b.get._1 && !list.exists(_ != Blank)) {
+        //在同一直线上并且两者间没有障碍物
+        if (redTurn) 3 else 4
+      }
+      else {
+        val bossPos = if (redTurn) r.get else b.get
+        val list = for {
+          i <- 0 to 8
+          j <- 0 to 9
+          if !checkerboard(i)(j).isEmpty && checkerboard(i)(j).isRed != redTurn //正确的颜色
+          if canMove(Pos(i, j), Pos(bossPos._1, bossPos._2), checkerboard(i)(j).status)
+        } yield 1
+        if (list.isEmpty)
+        //没有将军
+          if (redTurn) 5 else 6
+        else {
+          if (redTurn) 2 else 1
+        }
+      }
+    }
+  }
+
+  def getMessage(request: Message[_]): Future[(List[String], Message[_], Boolean)] = request.`type` match {
     case Message.TYPE_GAME_REQUEST =>
       val m = request.asInstanceOf[Message[GameRequest]]
       if (m.data.`type` == 1) startMessage(m) else endMessage(m)
     case Message.TYPE_MOVE_REQUEST => moveMessage(request.asInstanceOf[Message[MoveRequest]])
   }
 
+  @deprecated
   private def moveForTest(from: Pos, to: Pos): Unit = {
     checkerboard(to.x)(to.y) = checkerboard(from.x)(from.y)
     checkerboard(from.x)(from.y) = Blank
     redTurn = !redTurn
   }
 
-  def startMessage(request: Message[GameRequest]): Future[(List[String], Message[GameResponse])] = {
+  def startMessage(request: Message[GameRequest]): Future[(List[String], Message[GameResponse], Boolean)] = {
     Future {
       if (room.red == null || room.black == null || state != 0)
         false
@@ -52,20 +130,20 @@ class Game(room: Room) {
     } map {
       if (_) {
         state = 0
-        (List(request.key), startFailedMessage())
+        (List(request.key), startFailedMessage(), false)
       }
       else {
         state = 1
-        (List(room.red, room.black), startSuccessMessage())
+        (List(room.red, room.black), startSuccessMessage(), false)
       }
     }
   }
 
-  def endMessage(request: Message[GameRequest]): Future[(List[String], Message[GameResponse])] = {
+  def endMessage(request: Message[GameRequest]): Future[(List[String], Message[GameResponse], Boolean)] = {
     null
   }
 
-  def moveMessage(request: Message[MoveRequest]): Future[(List[String], Message[MoveResponse])] = {
+  def moveMessage(request: Message[MoveRequest]): Future[(List[String], Message[MoveResponse], Boolean)] = {
     Future {
       val isRed: Boolean = request.key == room.red
       if (isRed == redTurn) {
@@ -75,43 +153,60 @@ class Game(room: Room) {
         moveStep(Step(from, to, request.key))
       } else {
         //不是我的回合
-        // TODO: 发送消息
-        null
+        (List(request.key), failMoveMessage("不是你的回合！"), false)
       }
     }
   }
 
-  private def moveStep(step: Step): (List[String], Message[MoveResponse]) = {
+  private def moveStep(step: Step): (List[String], Message[MoveResponse], Boolean) = {
     val isRed = step.mover == room.red
     if (checkerboard(step.from.y)(step.from.x) == Blank) {
       //空子
       val msg = failMoveMessage()
-      (List(step.mover), msg)
+      (List(step.mover), msg, false)
     } else {
       val piece = checkerboard(step.from.x)(step.from.y).asInstanceOf[Piece]
       if (piece.red == isRed) {
         //颜色对了 走的是自己的棋子
-        val f: (Int, Int) => Pie = (a, b) => checkerboard(a)(b)
 
-        implicit def intToF3(status: Int): (Pos, Pos, Boolean) => Boolean = (x, y, b) => MoveLaws.laws(status)(x, y, b, f)
 
-        // TODO: 完成正确的移动/胜负判定以及发送消息
-        if (canMove(step.from, step.to, piece.red, piece.status)) {
-          null
+        if (canMove(step.from, step.to, piece.status)) {
+          actualMove(step.from, step.to)
+          (List(room.red, room.black), successMoveResponse(step.from, step.to), true)
         } else {
           val msg = failMoveMessage()
-          (List(step.mover), msg)
+          (List(step.mover), msg, false)
         }
       } else {
         //棋子颜色不对
         val msg = failMoveMessage()
-        (List(step.mover), msg)
+        (List(step.mover), msg, false)
       }
     }
   }
 
-  private def canMove(f: Pos, t: Pos, red: Boolean, law: (Pos, Pos, Boolean) => Boolean) = law(f, t, red)
+  private def canMove(f: Pos, t: Pos, law: (Pos, Pos) => Boolean) = law(f, t)
 
+  private def actualMove(from: Pos, to: Pos): Unit = {
+    checkerboard(to.x)(to.y) = checkerboard(from.x)(from.y)
+    checkerboard(from.x)(from.y) = Blank
+    redTurn = !redTurn
+  }
+
+  private def successMoveResponse(f: Pos, t: Pos): Message[MoveResponse] = {
+    val message = new Message[MoveResponse]
+    message.`type` = Message.TYPE_MOVE_RESPONSE
+    val data = new MoveResponse
+    data.success = true
+    count += 1
+    data.count = count
+    data.fromX = f.x
+    data.fromY = f.y
+    data.toX = t.x
+    data.toY = t.y
+    message.data = data
+    message
+  }
 
   private def failMoveMessage(info: String = null): Message[MoveResponse] = {
     val message = new Message[MoveResponse]
@@ -227,7 +322,8 @@ case object MoveLaws {
     }
   }
 
-  def soldierLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
+  def soldierLaw(x: Pos, y: Pos, f: (Int, Int) => Pie): Boolean = {
+    val b = f(x.x, x.y).isRed
     if ((x - y) != 1)
       false
     else if (checkSelfEat(x, y, b, f)) false
@@ -264,16 +360,17 @@ case object MoveLaws {
 
   }
 
-  def cannonLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
+  def cannonLaw(x: Pos, y: Pos, f: (Int, Int) => Pie): Boolean = {
+    val b = f(x.x, x.y).isRed
     if ((x - y) == 0) //不动
       false
     else if (checkSelfEat(x, y, b, f)) false
     else if (x mixed y) false
     else {
-      val target = f(y.x,y.y)
-      val count = if(target.isEmpty) 0 else 1
+      val target = f(y.x, y.y)
+      val count = if (target.isEmpty) 0 else 1
       val (xd, yd) = y distance x
-      val pieces=if (xd == 0) {
+      val pieces = if (xd == 0) {
         //竖直移动
         val range = if (yd > 0) x.y + 1 until y.y else y.y + 1 until x.y
         for (i <- range) yield f(x.x, i)
@@ -282,18 +379,20 @@ case object MoveLaws {
         val range = if (xd > 0) x.x + 1 until y.x else y.x + 1 until x.x
         for (i <- range) yield f(i, x.y)
       }
-      pieces.count(_ != Blank)==count
+      pieces.count(_ != Blank) == count
     }
   }
 
-  def vehicleLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
+  def vehicleLaw(x: Pos, y: Pos, f: (Int, Int) => Pie): Boolean = {
+    val b = f(x.x, x.y).isRed
+
     if ((x - y) == 0) //不动
       false
     else if (checkSelfEat(x, y, b, f)) false
     else if (x mixed y) false //不能斜着走
     else {
       val (xd, yd) = y distance x
-      val pieces=if (xd == 0) {
+      val pieces = if (xd == 0) {
         //竖直移动
         val range = if (yd > 0) x.y + 1 until y.y else y.y + 1 until x.y
         for (i <- range) yield f(x.x, i)
@@ -302,13 +401,14 @@ case object MoveLaws {
         val range = if (xd > 0) x.x + 1 until y.x else y.x + 1 until x.x
         for (i <- range) yield f(i, x.y)
       }
-      !pieces.exists(_ != Blank)//不允许跨过其他单位
+      !pieces.exists(_ != Blank) //不允许跨过其他单位
     }
 
   }
 
 
-  def horseLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
+  def horseLaw(x: Pos, y: Pos, f: (Int, Int) => Pie): Boolean = {
+    val b = f(x.x, x.y).isRed
     if ((x - y) != 3)
       false
     else if (checkSelfEat(x, y, b, f)) false
@@ -325,7 +425,8 @@ case object MoveLaws {
   }
 
 
-  def elephantLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
+  def elephantLaw(x: Pos, y: Pos, f: (Int, Int) => Pie): Boolean = {
+    val b = f(x.x, x.y).isRed
     if (b && y.y <= 4) //相不允许过河
       false
     else if (!b && y.y >= 5)
@@ -344,11 +445,11 @@ case object MoveLaws {
     *
     * @param x
     * @param y
-    * @param b 友军棋子颜色
     * @param f
     * @return
     */
-  def guardLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
+  def guardLaw(x: Pos, y: Pos, f: (Int, Int) => Pie): Boolean = {
+    val b = f(x.x, x.y).isRed
     if (y.x < 3 || y.x > 5) //左右越界
       false
     else if (b && y.y <= 6)
@@ -364,7 +465,8 @@ case object MoveLaws {
     }
   }
 
-  def generalLaw(x: Pos, y: Pos, b: Boolean, f: (Int, Int) => Pie): Boolean = {
+  def generalLaw(x: Pos, y: Pos, f: (Int, Int) => Pie): Boolean = {
+    val b = f(x.x, x.y).isRed
     if (y.x < 3 || y.x > 5) //左右越界
       false
     else if (b && y.y <= 6) //上下越界
@@ -375,7 +477,7 @@ case object MoveLaws {
     else (y - x) == 1
   }
 
-  val laws: Map[Int, (Pos, Pos, Boolean, (Int, Int) => Pie) => Boolean] = Map(
+  val laws: Map[Int, (Pos, Pos, (Int, Int) => Pie) => Boolean] = Map(
     0 -> soldierLaw _,
     1 -> cannonLaw _,
     2 -> vehicleLaw _,
@@ -412,9 +514,9 @@ object Game extends App {
       } else {
         val piece = game.checkerboard(poss(0).x)(poss(0).y).asInstanceOf[Piece]
 
-        implicit def intToF3(status: Int): (Pos, Pos, Boolean) => Boolean = (x, y, b) => MoveLaws.laws(status)(x, y, b, f)
+        implicit def intToF3(status: Int): (Pos, Pos) => Boolean = (x, y) => MoveLaws.laws(status)(x, y, f)
 
-        if (game.canMove(poss(0), poss(1), piece.red, piece.status)) {
+        if (game.canMove(poss(0), poss(1), piece.status)) {
           println("合法移动！")
           game.moveForTest(poss(0), poss(1))
           game.printChessBoardInConsole()
@@ -429,6 +531,8 @@ object Game extends App {
 
 abstract class Pie(chess: Boolean) {
   def isRed: Boolean
+
+  def status: Int
 
   def info: String
 
@@ -447,6 +551,8 @@ case object Blank extends Pie(false) {
   override def isEmpty: Boolean = true
 
   override def info: String = "Blank"
+
+  override def status: Int = -1
 }
 
 case class Piece(red: Boolean, status: Int) extends Pie(true) {

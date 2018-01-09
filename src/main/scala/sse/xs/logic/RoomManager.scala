@@ -57,7 +57,7 @@ class RoomManager(server: Server) {
     } else {
       //房间加入失败
       val msg = getResponse(room, Message.TYPE_ROOM_RESPONSE, Message.TYPE_JOIN_ROOM, success = false)
-      server.getSender.sendMessage(msg.toString, message.key)
+      server.getSender.sendMessageAsync(msg.toString, message.key)
     }
   }
 
@@ -76,12 +76,12 @@ class RoomManager(server: Server) {
       val str = msg.toString
       val result = leaveRoom(room.roomKey, message.key)
       if (result != 0) {
-        server.getSender.sendMessage(str, red)
-        server.getSender.sendMessage(str, black)
+        server.getSender.sendMessageAsync(str, red)
+        server.getSender.sendMessageAsync(str, black)
       } else {
         //离开这个房间fail：reason：房间失效  reason:不在这个房间
         val fail = getResponse(room, Message.TYPE_ROOM_RESPONSE, Message.TYPE_LEAVE_ROOM, success = false)
-        server.getSender.sendMessage(false.toString, message.key)
+        server.getSender.sendMessageAsync(false.toString, message.key)
       }
 
     }
@@ -112,9 +112,9 @@ class RoomManager(server: Server) {
     if (room != null) {
       val sender = server.getSender
       if (room.red != null)
-        sender.sendMessage(msg, room.red)
+        sender.sendMessageAsync(msg, room.red)
       if (room.black != null)
-        sender.sendMessage(msg, room.black)
+        sender.sendMessageAsync(msg, room.black)
     }
   }
 
@@ -123,9 +123,9 @@ class RoomManager(server: Server) {
     if (room != null) {
       val sender = server.getSender
       if (room.red != null)
-        sender.sendMessage(msg, room.red)
+        sender.sendMessageAsync(msg, room.red)
       if (room.black != null)
-        sender.sendMessage(msg, room.black)
+        sender.sendMessageAsync(msg, room.black)
     }
   }
 

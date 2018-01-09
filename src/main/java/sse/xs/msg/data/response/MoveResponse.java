@@ -10,6 +10,7 @@ public class MoveResponse {
     public int fromY;
     public int toX;
     public int toY;
+    public int count;
     public boolean success;
     public String info;
 

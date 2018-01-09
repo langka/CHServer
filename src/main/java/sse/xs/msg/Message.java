@@ -45,6 +45,7 @@ public class Message<T> {
     public static final int TYPE_GAME_RESPONSE = 401;
     public static final int TYPE_MOVE_REQUEST = 402;
     public static final int TYPE_MOVE_RESPONSE = 403;
+    public static final int TYPE_TURN_CHANGE = 404;
 
     private static HashMap<Integer, Class> classMaps = new HashMap<>();
 
@@ -65,6 +66,8 @@ public class Message<T> {
         classMaps.put(103, AccountResponse.class);
 
         classMaps.put(300, RoomResponse.class);
+
+        classMaps.put(404,TurnChangeMsg.class);
 
     }
 

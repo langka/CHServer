@@ -19,14 +19,21 @@ class Sender(server: Server) {
     }
   }
 
-  def sendMessage(msg: String, targetKey: String): Unit = {
+  def sendMessageAsync(msg: String, targetKey: String): Unit = {
     val f: OnlineUser => Unit = a => if (a != null) a.sendMessage(msg)
     if (targetKey != null)
       Future(server.getOnlineUser(targetKey)).foreach(f)
   }
 
+  def sendMessageSync(msg: String, targetKey: String): Unit = {
+    val user = server.getOnlineUser(targetKey)
+    if (user != null)
+      user.sendMessage(msg)
+  }
+
 }
-object Sender extends App{
+
+object Sender extends App {
   val y = 1 until 1
   println(y)
 }

@@ -40,7 +40,7 @@ public class UserController {
             response.info = "账号或密码错误";
             responseMessage.data = response;
         }
-        server.getSender().sendMessage(responseMessage.toString(), message.key);
+        server.getSender().sendMessageAsync(responseMessage.toString(), message.key);
     }
 
     public void handleLogOut(Message message) {
