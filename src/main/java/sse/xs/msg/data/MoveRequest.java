@@ -8,6 +8,7 @@ import scala.util.parsing.combinator.testing.Str;
  * Email:xusongnice@gmail.com
  */
 public class MoveRequest {
+    public String room;
     public int fromX;
     public int fromY;
     public int toX;

@@ -31,6 +31,7 @@ public class OnlineUser {
     private final MessageListener listener = (message) -> dispatchThreads.submit(getTask(message));
 
     private static Runnable getTask(Message m) {
+        System.out.println("received new request "+m.getEasyInfo());
         switch (m.type) {
             case Message.TYPE_LOG_IN:
                 return () -> UserController.getInstance().handleLogIn(m);
@@ -43,10 +44,14 @@ public class OnlineUser {
             case Message.TYPE_SWAP_ROOM:
             case Message.TYPE_CREATE_ROOM:
                 return () -> Server.GET().dispatchRoomMessage(m);
+            case Message.TYPE_STATICS:
+                return ()->Server.GET().sendBackStatics(m);
         }
         return () -> {
         };
     }
+
+
 
     // TODO: 2018/1/3 完成全部的message类型
     public OnlineUser() {

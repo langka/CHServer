@@ -4,8 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import sse.xs.entity.UserInfo;
 import sse.xs.msg.data.*;
-import sse.xs.msg.data.response.AccountResponse;
-import sse.xs.msg.data.response.RoomResponse;
+import sse.xs.msg.data.response.*;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -31,6 +30,7 @@ public class Message<T> {
     public static final int TYPE_SWAP_ROOM = 9;
 
     public static final int TYPE_STATICS = 10;
+    public static final int TYPE_STATICS_RESP = 11;
 
 
     public static final int TYPE_LOGIN_RESPONSE = 100;
@@ -60,17 +60,26 @@ public class Message<T> {
         classMaps.put(8, RoomRequest.class);
         classMaps.put(9, RoomRequest.class);
 
+        classMaps.put(10,StaticsRequest.class);
+        classMaps.put(11,StaticsResponse.class);
+
         classMaps.put(100, AccountResponse.class);
         classMaps.put(101, AccountResponse.class);
         classMaps.put(102, AccountResponse.class);
         classMaps.put(103, AccountResponse.class);
 
         classMaps.put(300, RoomResponse.class);
+        classMaps.put(301, NormalMessage.class);
 
+        classMaps.put(400,GameRequest.class);
+        classMaps.put(401, GameResponse.class);
+        classMaps.put(402, MoveRequest.class);
+        classMaps.put(403, MoveResponse.class);
         classMaps.put(404,TurnChangeMsg.class);
 
     }
 
+    public int id;//客户端的操作码
     public int type;
     public String key;//每次操作的标识码,同一个标识码标志一个终端
     public T data;
@@ -183,5 +192,9 @@ public class Message<T> {
         Class clazz = classMaps.get(type);
         ParameterizedType parameterizedType = generateType(clazz);
         return gson.toJson(this, parameterizedType);
+    }
+
+    public String getEasyInfo(){
+        return "id:"+id+"type:"+type+" key:"+key;
     }
 }

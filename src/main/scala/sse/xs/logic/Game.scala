@@ -34,7 +34,7 @@ class Game(room: Room) {
       e._3
   } onSuccess {
     case e => println("board get changed!")
-      val state = isInDangerOrDead()
+      val state = inDangerOrDead
       val turnChange = new TurnChangeMsg(state)
       val m = createTurnMessage(turnChange)
       List(room.red, room.black) foreach (x => sender.sendMessageSync(m.toString, x))
@@ -73,7 +73,7 @@ class Game(room: Room) {
   //1 红色将军 2 黑色将军 3 红色胜利 4 黑色胜利 5 无事发生
 
   //redTurn已经改变，指示着下一个下棋的人了
-  private def isInDangerOrDead(): Int = {
+  private def inDangerOrDead: Int = {
     val r = redBossLocation()
     val b = blackBossLocation()
     if (r.isEmpty)

@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantLock
 
 import sse.xs.msg.Message
-import sse.xs.msg.data.RoomRequest
+import sse.xs.msg.data.{GameRequest, MoveRequest, RoomRequest}
 import sse.xs.msg.data.response.RoomResponse
 import sse.xs.server.{Sender, Server}
 
@@ -22,14 +22,19 @@ class RoomManager(server: Server) {
   val leaveF: (Room, String) => Int = (r, s) => if (r == null) 0 else r.leave(s)
   val swapF: (Room, String) => Int = (r, s) => r.swap()
 
-  def handleRoomMessage(message: Message[RoomRequest]): Unit = {
+  def handleRoomMessage(message: Message[_]): Unit = {
     message.`type` match {
-      case Message.TYPE_CREATE_ROOM => dealCreate(message)
-      case Message.TYPE_JOIN_ROOM => dealEnter(message)
-      case Message.TYPE_LEAVE_ROOM => dealLeave(message)
-      case Message.TYPE_SWAP_ROOM => dealSwap(message)
+      case Message.TYPE_CREATE_ROOM => dealCreate(message.asInstanceOf[Message[RoomRequest]])
+      case Message.TYPE_JOIN_ROOM => dealEnter(message.asInstanceOf[Message[RoomRequest]])
+      case Message.TYPE_LEAVE_ROOM => dealLeave(message.asInstanceOf[Message[RoomRequest]])
+      case Message.TYPE_SWAP_ROOM => dealSwap(message.asInstanceOf[Message[RoomRequest]])
+      case Message.TYPE_GAME_REQUEST =>rooms.get(message.asInstanceOf[Message[GameRequest]].data.room).game.handleGameMessage(message)
+      case Message.TYPE_MOVE_REQUEST =>rooms.get(message.asInstanceOf[Message[MoveRequest]].data.room).game.handleGameMessage(message)
     }
   }
+
+  def getRooms:java.util.Collection[Room] = rooms.values()
+
 
   private def dealCreate(message: Message[RoomRequest]): Unit = {
     val roomRequest = message.data
@@ -38,13 +43,13 @@ class RoomManager(server: Server) {
     val room = new Room(name = name, degree = roomRequest.degree, pwd = pwd, master = message.key,server.getSender)
     val roomKey = createRoom(room)
     room.roomKey = roomKey
-    val msg = getResponse(room, Message.TYPE_ROOM_RESPONSE, Message.TYPE_CREATE_ROOM)
+    val msg = getRoomResponse(message.id,room, Message.TYPE_ROOM_RESPONSE, Message.TYPE_CREATE_ROOM)
     sendToRoom(roomKey, msg.toString)
   }
 
   private def dealSwap(message: Message[RoomRequest]): Unit = {
     val result = swap(message.data.targetRoom, null)
-    val msg = getResponse(getRoom(message.data.targetRoom), Message.TYPE_ROOM_RESPONSE, Message.TYPE_SWAP_ROOM)
+    val msg = getRoomResponse(message.id,getRoom(message.data.targetRoom), Message.TYPE_ROOM_RESPONSE, Message.TYPE_SWAP_ROOM)
     sendToRoom(message.data.targetRoom, msg.toString)
   }
 
@@ -52,11 +57,11 @@ class RoomManager(server: Server) {
     val result = enterRoom(message.data.targetRoom, message.key)
     val room = rooms.get(message.data.targetRoom)
     if (result != 0) {
-      val msg = getResponse(room, Message.TYPE_ROOM_RESPONSE, Message.TYPE_JOIN_ROOM)
+      val msg = getRoomResponse(message.id,room, Message.TYPE_ROOM_RESPONSE, Message.TYPE_JOIN_ROOM)
       sendToRoom(message.data.targetRoom, message.toString)
     } else {
       //房间加入失败
-      val msg = getResponse(room, Message.TYPE_ROOM_RESPONSE, Message.TYPE_JOIN_ROOM, success = false)
+      val msg = getRoomResponse(message.id,room, Message.TYPE_ROOM_RESPONSE, Message.TYPE_JOIN_ROOM, success = false)
       server.getSender.sendMessageAsync(msg.toString, message.key)
     }
   }
@@ -64,10 +69,13 @@ class RoomManager(server: Server) {
 
   def dealLeave(message: Message[RoomRequest]): Unit = {
     val room = rooms.get(message.data.targetRoom)
-    val msg = getResponse(room, Message.TYPE_ROOM_RESPONSE, Message.TYPE_LEAVE_ROOM)
+    val msg = getRoomResponse(message.id,room, Message.TYPE_ROOM_RESPONSE, Message.TYPE_LEAVE_ROOM)
     if (room.master == message.key) {
       //destroy the room
       rooms.remove(room.roomKey)
+      msg.data.info = "房主取消了房间"
+      msg.data.red = null
+      msg.data.black = null
       sendToRoom(room, msg.toString)
     } else {
       //leave the room
@@ -76,14 +84,17 @@ class RoomManager(server: Server) {
       val str = msg.toString
       val result = leaveRoom(room.roomKey, message.key)
       if (result != 0) {
+        if(result==1)
+          msg.data.red = null
+        else if(result==2)
+          msg.data.black = null
         server.getSender.sendMessageAsync(str, red)
         server.getSender.sendMessageAsync(str, black)
       } else {
         //离开这个房间fail：reason：房间失效  reason:不在这个房间
-        val fail = getResponse(room, Message.TYPE_ROOM_RESPONSE, Message.TYPE_LEAVE_ROOM, success = false)
+        val fail = getRoomResponse(message.id,room, Message.TYPE_ROOM_RESPONSE, Message.TYPE_LEAVE_ROOM, success = false)
         server.getSender.sendMessageAsync(false.toString, message.key)
       }
-
     }
   }
 
@@ -136,12 +147,15 @@ class RoomManager(server: Server) {
     * @param actualTp 指示具体的操作
     * @return
     */
-  private def getResponse(room: Room, tp: Int, actualTp: Int, success: Boolean = true): Message[RoomResponse] = {
+
+  private def getRoomResponse(id:Int,room: Room, tp: Int, actualTp: Int, success: Boolean = true): Message[RoomResponse] = {
     val response = new RoomResponse
     val msg = new Message[RoomResponse]
     msg.`type` = tp
+    msg.id = id
     response.`type` = actualTp
     response.roomKey = room.roomKey
+    response.master = room.master
     response.red = room.red
     response.black = room.black
     response.success = success

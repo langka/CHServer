@@ -4,14 +4,17 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import sse.xs.conn.JsonConnection;
 import sse.xs.entity.OnlineUser;
+import sse.xs.logic.Room;
 import sse.xs.logic.RoomManager;
 import sse.xs.msg.Message;
 import sse.xs.msg.data.ConnRequest;
 import sse.xs.msg.data.RoomRequest;
+import sse.xs.msg.data.response.StaticsResponse;
 
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Collection;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -69,10 +72,20 @@ public class Server {
         return connHandler.getByKey(key);
     }
 
-    public void dispatchRoomMessage(Message<RoomRequest> message){
+    public void dispatchRoomMessage(Message message){
         roomManager.handleRoomMessage(message);
     }
 
+    public void sendBackStatics(Message m){
+        Collection<Room> rooms = roomManager.getRooms();
+        StaticsResponse response = StaticsResponse.createFromRooms(rooms);
+        Message<StaticsResponse> message = new Message<>();
+        message.data = response;
+        message.id = m.id;
+        message.type  = Message.TYPE_STATICS_RESP;
+        System.out.println("send back static resp: "+message.getEasyInfo());
+        getSender().sendMessageAsync(message.toString(),m.key);
+    }
 
     private Server() {
 
@@ -80,8 +93,10 @@ public class Server {
 
     public void start() throws IOException {
         ServerSocket serverSocket = new ServerSocket(9876);
+        System.out.println(serverSocket.getInetAddress());
         while (true) {
             Socket socket = serverSocket.accept();
+            System.out.println("client connected!");
             connExec.submit(new AcceptTask(connHandler,socket, bound));
         }
     }

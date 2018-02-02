@@ -15,4 +15,9 @@ public class RoomResponse {
     public String red;
     public String black;
     public int type;
+    public String info;
+    public String master;
+
+    public AccountResponse r;
+    public AccountResponse b;
 }

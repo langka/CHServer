@@ -31,6 +31,7 @@ public class ConnHandlerImpl implements ConnHandler {
             if (previous == null) {//put成功
                 try {
                     Message message = Message.createConnResp(key);
+                    System.out.println("writing conn response: "+key);
                     connection.writeJson(message.toString());
                     onlineUser.prepare();
                 } catch (IOException e) {

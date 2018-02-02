@@ -6,5 +6,5 @@ package sse.xs.msg.data;
  * Email:xusongnice@gmail.com
  * 房间消息
  */
-public class RoomMsg {
+public class NormalMessage {
 }
